@@ -1,6 +1,7 @@
 #define NOMINMAX
 #include <Windows.h>
 
+#include "addresslibrary5.h"
 #include "callerscope.h"
 #include "runtime.h"
 #include "skyrimnet.h"
@@ -99,6 +100,47 @@ namespace
 
         liveScope = nullptr;
         VirtualFree(code, 0, MEM_RELEASE);
+    }
+
+    void TestFormat5()
+    {
+        const std::array<std::uint32_t, 4> version{ 1, 7, 104, 0 };
+        const auto file = [](std::initializer_list<std::uint32_t> offsets) {
+            std::vector<std::uint32_t> words(24);
+            words[0] = 5;
+            words[1] = 1;
+            words[2] = 7;
+            words[3] = 104;
+            words[0x54 / 4] = 8;
+            words[0x5C / 4] = static_cast<std::uint32_t>(offsets.size());
+            words.insert(words.end(), offsets);
+            return std::string{ reinterpret_cast<const char*>(words.data()), words.size() * 4 };
+        };
+        const auto read = [&](const std::string& bytes, std::initializer_list<std::uint32_t> required) {
+            std::istringstream in{ bytes };
+            return AddressLibrary5::Read(in, version, std::span{ required.begin(), required.size() });
+        };
+
+        const auto good = file({ 0, 0x1000, 0, 0x2000 });
+        const auto table = read(good, { 1, 3 });
+        Check(!table.error && table.offsets == std::vector<std::uint32_t>{ 0, 0x1000, 0, 0x2000 }, "format 5 read");
+        Check(read(good, { 2 }).error, "format 5: unused ID refused");
+        Check(read(good, { 4 }).error, "format 5: ID past the end refused");
+        Check(read("", { 1 }).error, "format 5: empty or missing file refused");
+        Check(read(good.substr(0, 0x40), { 1 }).error, "format 5: short header refused");
+        Check(read(good.substr(0, good.size() - 1), { 1 }).error, "format 5: truncated table refused");
+        Check(read(good + '\0', { 1 }).error, "format 5: trailing data refused");
+
+        const auto changed = [&](std::size_t at, char value) {
+            auto bytes = good;
+            bytes[at] = value;
+            return bytes;
+        };
+        Check(read(changed(0x00, 2), { 1 }).error, "format 5: other format refused");
+        Check(read(changed(0x0C, 99), { 1 }).error, "format 5: other game version refused");
+        Check(read(changed(0x54, 4), { 1 }).error, "format 5: other pointer size refused");
+        Check(read(changed(0x58, 1), { 1 }).error, "format 5: other data format refused");
+        Check(read(changed(0x5F, 0x7F), { 1 }).error, "format 5: absurd count refused");
     }
 
     // Maps the DLL as a non-executable image, so none of its code runs.
@@ -204,7 +246,12 @@ int main(int argc, char** argv)
     Check(Runtime::IsSupported(0x01064920), "runtime 1.6.1170");
     Check(!Runtime::IsSupported(0x010400F0), "runtime VR 1.4.15 refused");
     Check(!Runtime::IsSupported(0x01070630), "runtime 1.7.99 refused");
-    Check(!Runtime::IsSupported(0x01070680), "runtime 1.7.104 refused");
+    Check(Runtime::IsSupported(0x01070680), "runtime 1.7.104");
+    Check(Runtime::UsesFormat5(0x01070680), "1.7.104 uses format 5");
+    Check(!Runtime::UsesFormat5(0x01064920), "1.6.1170 does not use format 5");
+    Check(!Runtime::IsSupported(0x01070681), "another build of 1.7.104 refused");
+    Check(!Runtime::IsSupported(0x01070690), "runtime 1.7.105 refused");
+    TestFormat5();
 
     TestLiveStack();
 

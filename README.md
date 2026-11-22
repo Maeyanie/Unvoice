@@ -18,10 +18,11 @@ Unvoice isn't affiliated with SkyrimNet or with any of the mods in its default l
 
 ## Requirements
 
-- Skyrim SE/AE 1.5.x or 1.6.x (not 1.7.x or VR) with [SKSE](https://skse.silverlock.org/)
+- Skyrim SE/AE 1.5.x, 1.6.x or 1.7.104 (experimental) with [SKSE](https://skse.silverlock.org/). Not VR
 - The current [Visual C++ x64 Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 - [Address Library for SKSE Plugins](https://www.nexusmods.com/skyrimspecialedition/mods/32444)
-- [Fuz Ro D-oh](https://www.nexusmods.com/skyrimspecialedition/mods/15109)
+- [Fuz Ro D-oh](https://www.nexusmods.com/skyrimspecialedition/mods/15109) **for your game version**:
+  its builds can be for one version only, e.g. 2.5 for 1.6.1170 and 2.6 for 1.7.104
 - SkyrimNet, with **Voice Silent NPCs** turned on, if you want TTS
 
 ## Use
@@ -47,9 +48,12 @@ filenames or dialogue.
 
 ## Compatibility
 
-Tested only on Skyrim 1.6.1170 with SkyrimNet 1.2.0 and Fuz Ro D-oh 2.5. Other 1.5.x and 1.6.x versions
-may work but are untested. 1.7.x and VR aren't supported: Unvoice declines to load there, and SKSE
-reports it.
+Tested in game only on Skyrim 1.6.1170, with Fuz Ro D-oh 2.5 and SkyrimNet 1.2.0 and 1.3.1. Other 1.5.x
+and 1.6.x versions may work but are untested.
+
+1.7.104 support is experimental: it has been checked against that version's Address Library and a
+simulated game, never the game itself. Other 1.7 versions and VR aren't supported: Unvoice declines to
+load there, and SKSE reports it.
 
 If SkyrimNet is installed and Unvoice can't recognise its sample extraction, for instance after an
 update, Unvoice mutes nothing and says so in the log.
@@ -112,6 +116,7 @@ DLL without running any of it, and their addresses apply to that version only.
 
 Unvoice's own code is under the [BSD Zero Clause License](LICENSE).
 
-The CommonLibSSE-NG submodule is pinned to an MIT-licensed commit. Later upstream commits are
+The CommonLibSSE-NG submodule is pinned to an MIT-licensed commit and used unmodified. Unvoice has its
+own reader for 1.7's Address Library format, as that commit predates it. Later upstream commits are
 GPL-3.0. Anyone distributing a built DLL needs to include the notices of the libraries linked into it:
 see [THIRD-PARTY-NOTICES.txt](release/THIRD-PARTY-NOTICES.txt).

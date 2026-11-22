@@ -1,8 +1,10 @@
 #include "pch.h"
 
 #include "callerscope.h"
+#include "format5.h"
 #include "runtime.h"
 #include "skyrimnet.h"
+#include "version.h"
 #include "voicepath.h"
 
 extern "C" __declspec(dllimport) unsigned short __stdcall RtlCaptureStackBackTrace(
@@ -117,6 +119,8 @@ namespace
     // DialogueItem::Ctor looks like the obvious site, but dialogue-menu answers are built without it.
     //
     // Not every call is playback: SkyrimNet finds voice samples through here too, see ShouldMute.
+    static_assert(offsetof(RE::TESTopicInfo::ResponseData, sound) == 0x18);  // the same on 1.5, 1.6 and 1.7
+
     struct BuildVoicePathHook
     {
         static bool thunk(RE::TESTopicInfo::ResponseData* a_response, char* a_path, RE::BGSVoiceType* a_voiceType,
@@ -148,7 +152,7 @@ namespace
 
         static bool Install()
         {
-            const REL::Relocation<std::uintptr_t> function{ RELOCATION_ID(34429, 35249) };
+            const REL::Relocation<std::uintptr_t> function{ RELOCATION_ID(Runtime::kResponseSetupSE, Runtime::kResponseSetupAE) };
             const auto                            site = function.address() + 0xDE;
 
             if (*reinterpret_cast<const std::uint8_t*>(site) != 0xE8) {
@@ -192,12 +196,21 @@ namespace
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
     // Nothing that touches REL can come before this, the log included. SKSE reports the refusal itself.
-    if (!Runtime::IsSupported(a_skse->RuntimeVersion().pack())) {
+    const auto version = a_skse->RuntimeVersion();
+    if (!Runtime::IsSupported(version.pack())) {
         return false;
+    }
+    if (Runtime::UsesFormat5(version.pack())) {
+        if (const auto* error = Format5::Install(Runtime::kRequiredAE)) {
+            SetupLog();
+            logs::error("Can't use the Address Library for 1.7.104 ({}), so not loading", error);
+            return false;
+        }
     }
 
     SKSE::Init(a_skse, false);
     SetupLog();
+    logs::info("Unvoice {} on Skyrim {}", UNVOICE_VERSION_STRING, version.string("."sv));
     LoadConfig();
 
     if (!g_plugins.empty() && BuildVoicePathHook::Install()) {
