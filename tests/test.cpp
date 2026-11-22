@@ -2,6 +2,7 @@
 #include <Windows.h>
 
 #include "callerscope.h"
+#include "runtime.h"
 #include "skyrimnet.h"
 #include "voicepath.h"
 
@@ -197,6 +198,13 @@ int main(int argc, char** argv)
 
     std::istringstream bom{ "\xEF\xBB\xBF[Plugins]\nA.esp\n" };
     Check(VoicePath::ReadList(bom).plugins == std::vector<std::string>{ "A.esp" }, "BOM before header");
+
+    Check(Runtime::IsSupported(0x01050610), "runtime 1.5.97");
+    Check(Runtime::IsSupported(0x010613D0), "runtime 1.6.317");
+    Check(Runtime::IsSupported(0x01064920), "runtime 1.6.1170");
+    Check(!Runtime::IsSupported(0x010400F0), "runtime VR 1.4.15 refused");
+    Check(!Runtime::IsSupported(0x01070630), "runtime 1.7.99 refused");
+    Check(!Runtime::IsSupported(0x01070680), "runtime 1.7.104 refused");
 
     TestLiveStack();
 

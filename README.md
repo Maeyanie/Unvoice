@@ -14,19 +14,22 @@ Unvoice is **not** a way around the opt-out. It's built so that SkyrimNet's samp
 exactly what it would without Unvoice. It also needs nothing from the mods except their plugin
 filenames: it doesn't read, change or include any of their files.
 
-Unvoice isn't affiliated with SkyrimNet.
+Unvoice isn't affiliated with SkyrimNet or with any of the mods in its default list.
 
 ## Requirements
 
-- Skyrim SE/AE with [SKSE](https://skse.silverlock.org/)
+- Skyrim SE/AE 1.5.x or 1.6.x (not 1.7.x or VR) with [SKSE](https://skse.silverlock.org/)
+- The current [Visual C++ x64 Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 - [Address Library for SKSE Plugins](https://www.nexusmods.com/skyrimspecialedition/mods/32444)
 - [Fuz Ro D-oh](https://www.nexusmods.com/skyrimspecialedition/mods/15109)
 - SkyrimNet, with **Voice Silent NPCs** turned on, if you want TTS
 
 ## Use
 
-1. Put `Unvoice.dll` and [`Unvoice.ini`](release/Unvoice.ini) in `Data/SKSE/Plugins`.
-2. List plugin filenames under `[Plugins]` in the INI, one per line:
+1. Install a zip from [Releases](https://github.com/Maeyanie/Unvoice/releases) with your mod manager, or put
+   `Unvoice.dll` and [`Unvoice.ini`](release/Unvoice.ini) in `Data/SKSE/Plugins`.
+2. Edit the list under `[Plugins]` in the INI. It starts with `SeranaDialogAddon.esp` and
+   `Ashe - Fire and Blood.esp`. Add or remove filenames, one per line:
 
    ```ini
    [Plugins]
@@ -36,14 +39,17 @@ Unvoice isn't affiliated with SkyrimNet.
 
 3. Restart the game.
 
+Installing a new version replaces the INI, so keep a copy if you've edited it.
+
 `Documents/My Games/Skyrim Special Edition/SKSE/Unvoice.log` says whether each entry was found and how
 many responses were muted or left real. It records entry numbers and counts only, never paths,
 filenames or dialogue.
 
 ## Compatibility
 
-Tested only on Skyrim 1.6.1170 with SkyrimNet 1.2.0 and Fuz Ro D-oh 2.5. Other SE/AE versions may work
-but are untested. VR isn't supported.
+Tested only on Skyrim 1.6.1170 with SkyrimNet 1.2.0 and Fuz Ro D-oh 2.5. Other 1.5.x and 1.6.x versions
+may work but are untested. 1.7.x and VR aren't supported: Unvoice declines to load there, and SKSE
+reports it.
 
 If SkyrimNet is installed and Unvoice can't recognise its sample extraction, for instance after an
 update, Unvoice mutes nothing and says so in the log.
@@ -107,4 +113,5 @@ DLL without running any of it, and their addresses apply to that version only.
 Unvoice's own code is under the [BSD Zero Clause License](LICENSE).
 
 The CommonLibSSE-NG submodule is pinned to an MIT-licensed commit. Later upstream commits are
-GPL-3.0. Anyone distributing a built DLL needs to include the notices of the libraries linked into it.
+GPL-3.0. Anyone distributing a built DLL needs to include the notices of the libraries linked into it:
+see [THIRD-PARTY-NOTICES.txt](release/THIRD-PARTY-NOTICES.txt).

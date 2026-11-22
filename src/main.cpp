@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "callerscope.h"
+#include "runtime.h"
 #include "skyrimnet.h"
 #include "voicepath.h"
 
@@ -190,6 +191,11 @@ namespace
 
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
+    // Nothing that touches REL can come before this, the log included. SKSE reports the refusal itself.
+    if (!Runtime::IsSupported(a_skse->RuntimeVersion().pack())) {
+        return false;
+    }
+
     SKSE::Init(a_skse, false);
     SetupLog();
     LoadConfig();
