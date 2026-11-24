@@ -11,8 +11,18 @@ set_warnings("allextra")
 
 add_rules("mode.debug", "mode.releasedbg")
 
+-- MIT. Hooks the start of a function whose first instructions differ by game version.
+add_requires("microsoft-detours 2023.6.8")
+
+-- Detours needs <windows.h>, which conflicts with CommonLib's own declarations, so it lives apart.
+target("entryhook")
+    set_kind("static")
+    add_files("glue/*.cpp")
+    add_headerfiles("glue/*.h")
+    add_packages("microsoft-detours")
+
 target("Unvoice")
-    add_deps("commonlibsse-ng")
+    add_deps("commonlibsse-ng", "entryhook")
 
     -- not CommonLib's plugin rule: src/plugin.cpp and src/version.rc declare the plugin, see there
     set_kind("shared")
@@ -21,7 +31,7 @@ target("Unvoice")
 
     add_files("src/**.cpp", "src/version.rc")
     add_headerfiles("src/**.h")
-    add_includedirs("src")
+    add_includedirs("src", "glue")
     set_pcxxheader("src/pch.h")
 
 -- game-independent logic: xmake build tests, then xmake run tests

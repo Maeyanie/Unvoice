@@ -6,6 +6,7 @@
 #include "runtime.h"
 #include "skyrimnet.h"
 #include "voicepath.h"
+#include "vraddresslibrary.h"
 
 #include <array>
 #include <cstdio>
@@ -43,6 +44,27 @@ namespace
         std::memcpy(buffer, in, std::strlen(in) + 1);
         const bool masked = Mask(buffer, plugins);
         Check(std::strcmp(buffer, expected) == 0 && masked == (std::strcmp(in, expected) != 0), what);
+    }
+
+    void TestVRAddressLibrary()
+    {
+        constexpr std::array<std::uint32_t, 2> required{ 34429, 514141 };
+        const auto check = [&](const std::string& text) {
+            std::istringstream in{ text };
+            return VRAddressLibrary::Check(in, required);
+        };
+        const std::string good = "id,offset\r\n3,0.158.0\r\n10827,0107430\r\n34429,0573b70\r\n514141,1F82AD8\r\n";
+        Check(!check(good), "VR CSV, CRLF");
+        Check(!check("id,offset\n3,0.158.0\n5388393136,1303ea0\n34429,0573b70\n514141,1f82ad8\n\n"), "VR CSV, LF, a long ID, a blank line at the end");
+        Check(check(good.substr(0, good.size() - 18)) != nullptr, "VR CSV, cut short");
+        Check(check("id,offset\r\n2,0.158.0\r\n10827,0107430\r\n34429,0573b70\r\n") != nullptr, "VR CSV without an ID needed");
+        Check(check("id,offset\r\n3,0.158.0\r\n10827,0107430\r\n34429,0\r\n514141,1f82ad8\r\n") != nullptr, "VR CSV, a needed address of 0");
+        Check(check("id,offset\r\n3,0.158.0\r\n10827,0107430\r\n\r\n34429,0573b70\r\n514141,1f82ad8\r\n") != nullptr, "VR CSV, a blank line partway");
+        Check(check("id,offset\r\n3,0.158.0\r\n10827,01074z0\r\n34429,0573b70\r\n514141,1f82ad8\r\n") != nullptr, "VR CSV, not hex");
+        Check(check("") != nullptr && check("id,offset\r\n") != nullptr, "VR CSV, empty");
+        std::istringstream missing;
+        missing.setstate(std::ios::failbit);
+        Check(VRAddressLibrary::Check(missing, required) != nullptr, "VR CSV, missing");
     }
 
     // A real stack walk through a jmp [rip] stub, which is what SKSE's trampoline puts between caller and hook.
@@ -238,13 +260,52 @@ int main(int argc, char** argv)
     Check(list.plugins == std::vector<std::string>{ "One Mod.esp", "Two=2, x.ESL", "Three.esm" }, "list entries");
     Check(list.rejectedLines == std::vector<std::size_t>{ 9, 10 }, "list rejects");
 
+    std::istringstream npcs{ "[NPCs]\nLydia\n  Jarl Balgruuf the Greater \n; Off\n[Plugins]\nA.esp\n[npcs]\nX=Y, Z.esp\n" };
+    const auto         withNpcs = VoicePath::ReadList(npcs);
+    Check(withNpcs.npcs == std::vector<std::string>{ "Lydia", "Jarl Balgruuf the Greater", "X=Y, Z.esp" }, "NPC entries");
+    Check(withNpcs.plugins == std::vector<std::string>{ "A.esp" } && withNpcs.rejectedLines.empty(), "plugins beside NPCs");
+    Check(VoicePath::IndexOf("LYDIA", withNpcs.npcs) == 0u && !VoicePath::IndexOf("Lydi", withNpcs.npcs), "NPC name match");
+    Check(!VoicePath::IndexOf("", withNpcs.npcs), "no name, no match");
+    const auto folder = VoicePath::PluginFolder(R"(Data\Sound\Voice\Skyrim.esm\FemaleEvenToned\L.fuz)");
+    Check(folder && folder->start == 17 && folder->end == 27, "plugin folder of an unlisted plugin");
+    Check(!VoicePath::PluginFolder(R"(Data\Sound\Voice\\v\l.wav)"), "empty plugin folder");
+    Check(!VoicePath::PluginFolder(R"(Data\Sound\FX\Skyrim.esm\l.wav)"), "not a voice path");
+
+    {
+        const auto ref = [](std::string_view text) { return VoicePath::ParseFormRef(text); };
+        const auto is = [&](std::string_view text, const char* plugin, std::uint32_t id) {
+            const auto r = ref(text);
+            return r && r->plugin == plugin && r->id == id;
+        };
+        Check(is("Skyrim.esm|00012EB7", "Skyrim.esm", 0x12EB7), "form ID, padded");
+        Check(is("skyrim.esm|12eb7", "skyrim.esm", 0x12EB7), "form ID, short and lower case");
+        Check(is("Dawnguard.esm|02000801", "Dawnguard.esm", 0x02000801), "form ID with load order");
+        Check(is(" MyMod.esl | 0xFE012800 ", "MyMod.esl", 0xFE012800), "form ID, spaced and 0x");
+        Check(!ref("Lydia") && !ref("Skyrim.esm|") && !ref("|12EB7") && !ref("Skyrim.esm|12EB7G"), "not form IDs");
+        Check(!ref("Skyrim|12EB7") && !ref("Skyrim.esm|123456789") && !ref("a\\b.esp|1"), "bad plugin or ID");
+        using VoicePath::FormIDIn;
+        Check(FormIDIn(0xA2C94, false, 0x00, 0) == 0x000A2C94 && FormIDIn(0x02000801, false, 0x02, 0) == 0x02000801,
+            "form ID in a full plugin");
+        Check(FormIDIn(0x801, false, 0x02, 0) == 0x02000801 && FormIDIn(0x05000801, false, 0x02, 0) == 0x02000801,
+            "form ID in a full plugin, short or with another load order");
+        Check(FormIDIn(0xFE012800, true, 0xFE, 0x012) == 0xFE012800 && FormIDIn(0x800, true, 0xFE, 0x012) == 0xFE012800,
+            "form ID in a light plugin");
+        Check(FormIDIn(0xFE012800, true, 0xFE, 0x013) == 0xFE013800, "form ID in a light plugin in another slot");
+        Check(FormIDIn(0xFE012800, true, 0x07, 0) == 0x07000800 && FormIDIn(0x800, true, 0x07, 0x012) == 0x07000800,
+            "form ID in a light-flagged plugin loaded as a full one (VR without ESL support)");
+        Check(FormIDIn(0x800, false, 0xFF, 0) == 0 && FormIDIn(0x800, true, 0xFF, 0x012) == 0, "form ID, not loaded");
+    }
+
     std::istringstream bom{ "\xEF\xBB\xBF[Plugins]\nA.esp\n" };
     Check(VoicePath::ReadList(bom).plugins == std::vector<std::string>{ "A.esp" }, "BOM before header");
 
     Check(Runtime::IsSupported(0x01050610), "runtime 1.5.97");
     Check(Runtime::IsSupported(0x010613D0), "runtime 1.6.317");
     Check(Runtime::IsSupported(0x01064920), "runtime 1.6.1170");
-    Check(!Runtime::IsSupported(0x010400F0), "runtime VR 1.4.15 refused");
+    Check(Runtime::IsSupported(0x010400F0) && Runtime::IsVR(0x010400F0), "runtime VR 1.4.15");
+    Check(!Runtime::IsSupported(0x01040020) && !Runtime::IsVR(0x01040020), "runtime SE 1.4.2 refused");
+    Check(!Runtime::IsVR(0x01050610) && !Runtime::IsVR(0x01070680), "SE and 1.7 aren't VR");
+    TestVRAddressLibrary();
     Check(!Runtime::IsSupported(0x01070630), "runtime 1.7.99 refused");
     Check(Runtime::IsSupported(0x01070680), "runtime 1.7.104");
     Check(Runtime::UsesFormat5(0x01070680), "1.7.104 uses format 5");
